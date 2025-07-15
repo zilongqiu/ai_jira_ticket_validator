@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle, Clock, Settings } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle } from "lucide-react"
 
 interface JiraTicket {
   key: string
@@ -34,12 +34,12 @@ export default function JiraTicketValidator() {
   const [jiraUsername, setJiraUsername] = useState("")
   const [jiraPassword, setJiraPassword] = useState("")
   const [jiraProject, setJiraProject] = useState("")
+  const [jqlQuery, setJqlQuery] = useState("")
   const [validationRules, setValidationRules] = useState(
       `
 - Title must be clear and descriptive
 - Description must include acceptance criteria
 - Priority must be set appropriately
-- Must have proper labels or components
 - Should include steps to reproduce for bugs
 - Must have clear business value for features
   `.trim(),
@@ -51,6 +51,14 @@ export default function JiraTicketValidator() {
   const [activeTab, setActiveTab] = useState("config")
   const [error, setError] = useState<string>("")
 
+  // JQL query examples for the placeholder
+  const getJqlPlaceholder = () => {
+    if (jiraProject) {
+      return `project=${jiraProject} AND status != Done ORDER BY created DESC`
+    }
+    return "project=PROJ AND status != Done ORDER BY created DESC"
+  }
+
   const fetchTickets = async () => {
     setIsLoading(true)
     setError("")
@@ -59,7 +67,7 @@ export default function JiraTicketValidator() {
       const response = await fetch("/api/jira/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jiraUrl, jiraUsername, jiraPassword, jiraProject }),
+        body: JSON.stringify({ jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery }),
       })
 
       const data = await response.json()
@@ -115,196 +123,233 @@ export default function JiraTicketValidator() {
   }
 
   return (
-      <div className="container mx-auto p-6 max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Jira Ticket Validator</h1>
-          <p className="text-muted-foreground">AI-powered validation of Jira tickets based on your custom criteria</p>
-        </div>
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Jira Ticket Validator</h1>
+        <p className="text-muted-foreground">AI-powered validation of Jira tickets based on your custom criteria</p>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="config" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Configuration
-            </TabsTrigger>
-            <TabsTrigger value="tickets">Tickets ({tickets.length})</TabsTrigger>
-            <TabsTrigger value="results">Results ({validationResults.length})</TabsTrigger>
-            <TabsTrigger value="rules">Validation Rules</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="config" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configuration
+          </TabsTrigger>
+          <TabsTrigger value="tickets">Tickets ({tickets.length})</TabsTrigger>
+          <TabsTrigger value="results">Results ({validationResults.length})</TabsTrigger>
+          <TabsTrigger value="rules">Validation Rules</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="config" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Jira Configuration</CardTitle>
-                <CardDescription>Configure your Jira connection to fetch tickets for validation</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="jira-url">Jira URL</Label>
-                    <Input
-                        id="jira-url"
-                        placeholder="https://yourcompany.atlassian.net"
-                        value={jiraUrl}
-                        onChange={(e) => setJiraUrl(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jira-project">Project Key</Label>
-                    <Input
-                        id="jira-project"
-                        placeholder="PROJ"
-                        value={jiraProject}
-                        onChange={(e) => setJiraProject(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="jira-username">Username</Label>
-                    <Input
-                        id="jira-username"
-                        placeholder="Your Jira username"
-                        value={jiraUsername}
-                        onChange={(e) => setJiraUsername(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="jira-password">Password</Label>
-                    <Input
-                        id="jira-password"
-                        type="password"
-                        placeholder="Your Jira password"
-                        value={jiraPassword}
-                        onChange={(e) => setJiraPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <Button
-                    onClick={fetchTickets}
-                    disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
-                    className="w-full"
-                >
-                  {isLoading ? "Fetching Tickets..." : "Fetch Tickets"}
-                </Button>
-                {error && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                      <p className="text-red-800 text-sm">{error}</p>
-                    </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tickets" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold">Fetched Tickets</h2>
-              <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
-                {isLoading ? "Validating..." : "Validate All Tickets"}
-              </Button>
-            </div>
-
-            <div className="grid gap-4">
-              {tickets.map((ticket) => (
-                  <Card key={ticket.key}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{ticket.key}</CardTitle>
-                          <CardDescription>{ticket.summary}</CardDescription>
-                        </div>
-                        <Badge variant="outline">{ticket.priority}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground line-clamp-3">{ticket.description}</p>
-                      <div className="flex gap-2 mt-3">
-                        <Badge variant="secondary">{ticket.status}</Badge>
-                        <Badge variant="outline">Reporter: {ticket.reporter}</Badge>
-                        {ticket.assignee && <Badge variant="outline">Assignee: {ticket.assignee}</Badge>}
-                      </div>
-                    </CardContent>
-                  </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="results" className="space-y-4">
-            <h2 className="text-2xl font-semibold">Validation Results</h2>
-
-            <div className="grid gap-4">
-              {validationResults.map((result) => (
-                  <Card key={result.ticket.key}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(result.isValid, result.score)}
-                          <div>
-                            <CardTitle className="text-lg">{result.ticket.key}</CardTitle>
-                            <CardDescription>{result.ticket.summary}</CardDescription>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Badge className={getStatusColor(result.isValid, result.score)}>Score: {result.score}/10</Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {result.issues.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-red-600 mb-2">Issues Found:</h4>
-                            <ul className="list-disc list-inside space-y-1">
-                              {result.issues.map((issue, index) => (
-                                  <li key={index} className="text-sm text-red-600">
-                                    {issue}
-                                  </li>
-                              ))}
-                            </ul>
-                          </div>
-                      )}
-
-                      {result.suggestions.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold text-blue-600 mb-2">Suggestions:</h4>
-                            <ul className="list-disc list-inside space-y-1">
-                              {result.suggestions.map((suggestion, index) => (
-                                  <li key={index} className="text-sm text-blue-600">
-                                    {suggestion}
-                                  </li>
-                              ))}
-                            </ul>
-                          </div>
-                      )}
-                    </CardContent>
-                  </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="rules" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Validation Rules</CardTitle>
-                <CardDescription>Customize the criteria used to validate Jira tickets</CardDescription>
-              </CardHeader>
-              <CardContent>
+        <TabsContent value="config" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Jira Configuration</CardTitle>
+              <CardDescription>Configure your Jira connection to fetch tickets for validation</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="validation-rules">Validation Criteria</Label>
-                  <Textarea
-                      id="validation-rules"
-                      placeholder="Enter your validation rules..."
-                      value={validationRules}
-                      onChange={(e) => setValidationRules(e.target.value)}
-                      rows={12}
+                  <Label htmlFor="jira-url">Jira URL</Label>
+                  <Input
+                    id="jira-url"
+                    placeholder="https://yourcompany.atlassian.net"
+                    value={jiraUrl}
+                    onChange={(e) => setJiraUrl(e.target.value)}
                   />
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jira-project">Project Key</Label>
+                  <Input
+                    id="jira-project"
+                    placeholder="PROJ"
+                    value={jiraProject}
+                    onChange={(e) => setJiraProject(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jira-username">Username</Label>
+                  <Input
+                    id="jira-username"
+                    placeholder="your.username"
+                    value={jiraUsername}
+                    onChange={(e) => setJiraUsername(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jira-password">Password</Label>
+                  <Input
+                    id="jira-password"
+                    type="password"
+                    placeholder="Your Jira password"
+                    value={jiraPassword}
+                    onChange={(e) => setJiraPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="jql-query">JQL Query (Optional)</Label>
+                  <div className="group relative">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                      Leave empty to use default query for the project
+                    </div>
+                  </div>
+                </div>
+                <Textarea
+                  id="jql-query"
+                  placeholder={getJqlPlaceholder()}
+                  value={jqlQuery}
+                  onChange={(e) => setJqlQuery(e.target.value)}
+                  rows={3}
+                />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>
+                    <strong>Examples:</strong>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND status != Done ORDER BY created DESC</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND priority=High AND assignee=currentUser()</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND created {">"} -7d AND status IN (Open, "In Progress")</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND labels=bug ORDER BY priority DESC</code>
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                onClick={fetchTickets}
+                disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
+                className="w-full"
+              >
+                {isLoading ? "Fetching Tickets..." : "Fetch Tickets"}
+              </Button>
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-red-800 text-sm">{error}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-semibold">Fetched Tickets</h2>
+            <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
+              {isLoading ? "Validating..." : "Validate All Tickets"}
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {tickets.map((ticket) => (
+              <Card key={ticket.key}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{ticket.key}</CardTitle>
+                      <CardDescription>{ticket.summary}</CardDescription>
+                    </div>
+                    <Badge variant="outline">{ticket.priority}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground line-clamp-3">{ticket.description}</p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Badge variant="secondary">{ticket.status}</Badge>
+                    <Badge variant="outline">Reporter: {ticket.reporter}</Badge>
+                    {ticket.assignee && <Badge variant="outline">Assignee: {ticket.assignee}</Badge>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="results" className="space-y-4">
+          <h2 className="text-2xl font-semibold">Validation Results</h2>
+
+          <div className="grid gap-4">
+            {validationResults.map((result) => (
+              <Card key={result.ticket.key}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(result.isValid, result.score)}
+                      <div>
+                        <CardTitle className="text-lg">{result.ticket.key}</CardTitle>
+                        <CardDescription>{result.ticket.summary}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge className={getStatusColor(result.isValid, result.score)}>Score: {result.score}/10</Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {result.issues.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-red-600 mb-2">Issues Found:</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {result.issues.map((issue, index) => (
+                          <li key={index} className="text-sm text-red-600">
+                            {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {result.suggestions.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-blue-600 mb-2">Suggestions:</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {result.suggestions.map((suggestion, index) => (
+                          <li key={index} className="text-sm text-blue-600">
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Validation Rules</CardTitle>
+              <CardDescription>Customize the criteria used to validate Jira tickets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="validation-rules">Validation Criteria</Label>
+                <Textarea
+                  id="validation-rules"
+                  placeholder="Enter your validation rules..."
+                  value={validationRules}
+                  onChange={(e) => setValidationRules(e.target.value)}
+                  rows={12}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { jiraUrl, jiraUsername, jiraPassword, jiraProject } = await request.json()
+    const { jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery } = await request.json()
 
     // Validate required parameters
     if (!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject) {
@@ -15,19 +15,16 @@ export async function POST(request: NextRequest) {
     // Clean up the Jira URL (remove trailing slash if present)
     const cleanJiraUrl = jiraUrl.replace(/\/$/, "")
 
-    // Create JQL query to fetch tickets from the specified project
-    //const jql = `projectKey=${jiraProject} ORDER BY created DESC`
-    const jql = ``
-    const maxResults = 5 // Limit to 10 tickets for performance
+    // Use custom JQL query if provided, otherwise use default
+    const jql = jqlQuery && jqlQuery.trim() ? jqlQuery.trim() : `project=${jiraProject} ORDER BY created DESC`
+
+    const maxResults = 10 // Increased limit for more flexibility
 
     // Prepare the API endpoint
     const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=key,summary,description,priority,status,assignee,reporter,created`
 
     // Create authorization header using username:password
     const auth = Buffer.from(`${jiraUsername}:${jiraPassword}`).toString("base64")
-
-
-    console.log("Fetching from Jira:", apiUrl)
 
     const response = await fetch(apiUrl, {
       method: "GET",
@@ -36,13 +33,17 @@ export async function POST(request: NextRequest) {
         "Accept": "application/json",
       },
     })
-    console.log(response)
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error("Jira API Error:", response.status, errorText)
 
-      if (response.status === 401) {
+      if (response.status === 400) {
+        return NextResponse.json(
+          { error: "Invalid JQL query. Please check your query syntax and try again." },
+          { status: 400 },
+        )
+      } else if (response.status === 401) {
         return NextResponse.json(
             { error: "Authentication failed. Please check your Jira URL, username, and password." },
             { status: 401 },
