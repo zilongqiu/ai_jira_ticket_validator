@@ -70,3 +70,12 @@ npm run dev
 | LLMs              | OpenAI / gpt-4o-mini (via API)                        |
 
 ![2025](./screenshots/ai_2025.webp "2025")
+
+---
+
+## 📜  Liability Disclaimer
+
+This **ai_jira_ticket_validator** is provided "as is" without any warranties or guarantees.
+I do not take responsibility for how the generated output is used, including but not limited to its accuracy, legality, or any potential consequences arising from its use.
+
+This project is licensed under the MIT License.
