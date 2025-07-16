@@ -2,13 +2,13 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery, maxResults } = await request.json()
+    const { jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery, maxResults, startAt = 0 } = await request.json() // Added startAt
 
     // Validate required parameters
     if (!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject) {
       return NextResponse.json(
-          { error: "Missing required parameters: jiraUrl, jiraUsername, jiraPassword, or jiraProject" },
-          { status: 400 },
+        { error: "Missing required parameters: jiraUrl, jiraUsername, jiraPassword, or jiraProject" },
+        { status: 400 },
       )
     }
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const resultsLimit = maxResults === "all" ? 1000 : Number.parseInt(maxResults) || 10
 
     // Prepare the API endpoint
-    const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${resultsLimit}&fields=key,summary,description,priority,status,assignee,reporter,created,labels,components`
+    const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${resultsLimit}&startAt=${startAt}&fields=key,summary,description,priority,status,assignee,reporter,created,labels,components`
 
     // Create authorization header using username:password
     const auth = Buffer.from(`${jiraUsername}:${jiraPassword}`).toString("base64")
@@ -47,29 +47,28 @@ export async function POST(request: NextRequest) {
         )
       } else if (response.status === 401) {
         return NextResponse.json(
-            { error: "Authentication failed. Please check your Jira URL, username, and password." },
-            { status: 401 },
+          { error: "Authentication failed. Please check your Jira URL, username, and password." },
+          { status: 401 },
         )
       } else if (response.status === 403) {
         return NextResponse.json(
-            { error: "Access denied. Please check your permissions for this Jira project." },
-            { status: 403 },
+          { error: "Access denied. Please check your permissions for this Jira project." },
+          { status: 403 },
         )
       } else if (response.status === 404) {
         return NextResponse.json(
-            { error: "Jira instance or project not found. Please check your Jira URL and project key." },
-            { status: 404 },
+          { error: "Jira instance or project not found. Please check your Jira URL and project key." },
+          { status: 404 },
         )
       } else {
         return NextResponse.json(
-            { error: `Jira API error: ${response.status} - ${errorText}` },
-            { status: response.status },
+          { error: `Jira API error: ${response.status} - ${errorText}` },
+          { status: response.status },
         )
       }
     }
 
     const data = await response.json()
-    console.log(data)
 
     // Transform Jira response to our ticket format
     const tickets = data.issues.map((issue: any) => {
@@ -107,8 +106,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching Jira tickets:", error)
     return NextResponse.json(
-        { error: "Failed to fetch tickets. Please check your configuration and try again." },
-        { status: 500 },
+      { error: "Failed to fetch tickets. Please check your configuration and try again." },
+      { status: 500 },
     )
   }
 }
