@@ -50,13 +50,13 @@ export default function JiraTicketValidator() {
   const [jqlQuery, setJqlQuery] = useState("")
   const [maxResults, setMaxResults] = useState("10")
   const [validationRules, setValidationRules] = useState(
-      `
+    `
 - Title must be clear and descriptive
 - Description must include acceptance criteria
 - Priority must be set appropriately
 - Should include steps to reproduce for bugs
 - Must have clear business value for features
-  `.trim(),
+`.trim(),
   )
 
   const [tickets, setTickets] = useState<JiraTicket[]>([])
@@ -185,340 +185,398 @@ export default function JiraTicketValidator() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Jira Ticket Validator</h1>
-        <p className="text-muted-foreground">AI-powered validation of Jira tickets based on your custom criteria</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto p-6 max-w-6xl bg-white rounded-lg shadow-lg">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Jira Ticket Validator</h1>
+          <p className="text-lg text-gray-600">AI-powered validation of Jira tickets based on your custom criteria</p>
+        </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="config" className="flex items-center gap-1">
-            <Settings className="h-4 w-4" />
-            Configuration
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="flex items-center gap-1">
-            <FileText className="h-4 w-4" />
-            Validation Rules
-          </TabsTrigger>
-          <TabsTrigger value="tickets" className="flex items-center gap-1">
-            <Ticket className="h-4 w-4" />
-            Tickets ({tickets.length})
-            {fetchInfo && fetchInfo.total > fetchInfo.fetched && (
-              <span className="text-xs text-muted-foreground">of {fetchInfo.total}</span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="results" className="flex items-center gap-1">
-            <BarChart3 className="h-4 w-4" />
-            Results ({validationResults.length})
-          </TabsTrigger>
-        </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="flex w-full border-b border-gray-200 bg-transparent rounded-none">
+            <TabsTrigger
+              value="config"
+              className="flex items-center gap-1 px-6 py-3 text-base font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+            >
+              <Settings className="h-4 w-4" />
+              Configuration
+            </TabsTrigger>
+            <TabsTrigger
+              value="rules"
+              className="flex items-center gap-1 px-6 py-3 text-base font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+            >
+              <FileText className="h-4 w-4" />
+              Validation Rules
+            </TabsTrigger>
+            <TabsTrigger
+              value="tickets"
+              className="flex items-center gap-1 px-6 py-3 text-base font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+            >
+              <Ticket className="h-4 w-4" />
+              Tickets ({tickets.length})
+              {fetchInfo && fetchInfo.total > fetchInfo.fetched && (
+                <span className="text-xs text-muted-foreground">of {fetchInfo.total}</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="results"
+              className="flex items-center gap-1 px-6 py-3 text-base font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Results ({validationResults.length})
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="config" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Jira Configuration</CardTitle>
-              <CardDescription>Configure your Jira connection to fetch tickets for validation</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="jira-url">Jira URL</Label>
-                  <Input
-                    id="jira-url"
-                    placeholder="https://yourcompany.atlassian.net"
-                    value={jiraUrl}
-                    onChange={(e) => setJiraUrl(e.target.value)}
-                  />
+          <TabsContent value="config" className="space-y-6">
+            <Card className="shadow-sm border border-gray-200 rounded-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-gray-800">Jira Configuration</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Configure your Jira connection to fetch tickets for validation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="jira-url" className="text-gray-700">
+                      Jira URL
+                    </Label>
+                    <Input
+                      id="jira-url"
+                      placeholder="https://yourcompany.atlassian.net"
+                      value={jiraUrl}
+                      onChange={(e) => setJiraUrl(e.target.value)}
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="jira-project" className="text-gray-700">
+                      Project Key
+                    </Label>
+                    <Input
+                      id="jira-project"
+                      placeholder="PROJ"
+                      value={jiraProject}
+                      onChange={(e) => setJiraProject(e.target.value)}
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jira-project">Project Key</Label>
-                  <Input
-                    id="jira-project"
-                    placeholder="PROJ"
-                    value={jiraProject}
-                    onChange={(e) => setJiraProject(e.target.value)}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="jira-username" className="text-gray-700">
+                      Username
+                    </Label>
+                    <Input
+                      id="jira-username"
+                      placeholder="Your Jira username"
+                      value={jiraUsername}
+                      onChange={(e) => setJiraUsername(e.target.value)}
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="jira-password" className="text-gray-700">
+                      Password
+                    </Label>
+                    <Input
+                      id="jira-password"
+                      type="password"
+                      placeholder="Your Jira password"
+                      value={jiraPassword}
+                      onChange={(e) => setJiraPassword(e.target.value)}
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="jira-username">Username</Label>
-                  <Input
-                    id="jira-username"
-                    placeholder="Your Jira username"
-                    value={jiraUsername}
-                    onChange={(e) => setJiraUsername(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jira-password">Password</Label>
-                  <Input
-                    id="jira-password"
-                    type="password"
-                    placeholder="Your Jira password"
-                    value={jiraPassword}
-                    onChange={(e) => setJiraPassword(e.target.value)}
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="jql-query">JQL Query (Optional)</Label>
-                    <div className="group relative">
-                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                        Leave empty to use default query for the project
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="jql-query" className="text-gray-700">
+                        JQL Query (Optional)
+                      </Label>
+                      <div className="group relative">
+                        <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                          Leave empty to use default query for the project
+                        </div>
                       </div>
                     </div>
+                    <Textarea
+                      id="jql-query"
+                      placeholder={getJqlPlaceholder()}
+                      value={jqlQuery}
+                      onChange={(e) => setJqlQuery(e.target.value)}
+                      rows={3}
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max-results" className="text-gray-700">
+                      Max Results
+                    </Label>
+                    <select
+                      id="max-results"
+                      value={maxResults}
+                      onChange={(e) => setMaxResults(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="10">10 tickets</option>
+                      <option value="20">20 tickets</option>
+                      <option value="50">50 tickets</option>
+                      <option value="100">100 tickets</option>
+                      <option value="all">All tickets</option>
+                    </select>
+                    <p className="text-xs text-gray-500">
+                      {maxResults === "all"
+                        ? "Fetches up to 1000 tickets (Jira's maximum)"
+                        : `Fetches up to ${maxResults} tickets`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-500 space-y-1 p-4 bg-gray-50 rounded-md border border-gray-200">
+                  <p className="font-semibold text-gray-700">JQL Examples:</p>
+                  <p>
+                    • <code>project=PROJ AND status != Done ORDER BY created DESC</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND priority=High AND assignee=currentUser()</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND created {">"} -7d AND status IN (Open, "In Progress")</code>
+                  </p>
+                  <p>
+                    • <code>project=PROJ AND labels=bug ORDER BY priority DESC</code>
+                  </p>
+                </div>
+
+                <Button
+                  onClick={fetchTickets}
+                  disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
+                >
+                  {isLoading ? "Fetching Tickets..." : "Fetch Tickets"}
+                </Button>
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+                    <p>{error}</p>
+                  </div>
+                )}
+                {fetchInfo && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-blue-800 text-sm">
+                    <p>
+                      Fetched {fetchInfo.fetched} of {fetchInfo.total} available tickets
+                      {fetchInfo.total > fetchInfo.fetched && (
+                        <span className="ml-1">({fetchInfo.total - fetchInfo.fetched} more available)</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="rules" className="space-y-4">
+            <Card className="shadow-sm border border-gray-200 rounded-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-gray-800">Validation Rules</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Customize the criteria used to validate Jira tickets
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="validation-rules" className="text-gray-700">
+                    Validation Criteria
+                  </Label>
                   <Textarea
-                    id="jql-query"
-                    placeholder={getJqlPlaceholder()}
-                    value={jqlQuery}
-                    onChange={(e) => setJqlQuery(e.target.value)}
-                    rows={3}
+                    id="validation-rules"
+                    placeholder="Enter your validation rules..."
+                    value={validationRules}
+                    onChange={(e) => setValidationRules(e.target.value)}
+                    rows={12}
+                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max-results">Max Results</Label>
-                  <select
-                    id="max-results"
-                    value={maxResults}
-                    onChange={(e) => setMaxResults(e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="10">10 tickets</option>
-                    <option value="20">20 tickets</option>
-                    <option value="50">50 tickets</option>
-                    <option value="100">100 tickets</option>
-                    <option value="all">All tickets</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    {maxResults === "all"
-                      ? "Fetches up to 1000 tickets (Jira's maximum)"
-                      : `Fetches up to ${maxResults} tickets`}
+                <p className="text-sm text-gray-500 mt-2">
+                  Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tickets" className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Fetched Tickets</h2>
+                {fetchInfo && (
+                  <p className="text-sm text-gray-600">
+                    Showing {fetchInfo.fetched} of {fetchInfo.total} total tickets
                   </p>
-                </div>
+                )}
               </div>
-
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>
-                  <strong>JQL Examples:</strong>
-                </p>
-                <p>
-                  • <code>project=PROJ AND status != Done ORDER BY created DESC</code>
-                </p>
-                <p>
-                  • <code>project=PROJ AND priority=High AND assignee=currentUser()</code>
-                </p>
-                <p>
-                  • <code>project=PROJ AND created {">"} -7d AND status IN (Open, "In Progress")</code>
-                </p>
-                <p>
-                  • <code>project=PROJ AND labels=bug ORDER BY priority DESC</code>
-                </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={refreshTickets}
+                  disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
+                  className="flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200 bg-transparent"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  {isLoading ? "Refreshing..." : "Refresh Tickets"}
+                </Button>
+                <Button
+                  onClick={validateTickets}
+                  disabled={tickets.length === 0 || isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
+                >
+                  {isLoading ? "Validating..." : "Validate All Tickets"}
+                </Button>
               </div>
+            </div>
 
-              <Button
-                onClick={fetchTickets}
-                disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
-                className="w-full"
-              >
-                {isLoading ? "Fetching Tickets..." : "Fetch Tickets"}
-              </Button>
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                  <p className="text-red-800 text-sm">{error}</p>
-                </div>
-              )}
-              {fetchInfo && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-blue-800 text-sm">
-                    Fetched {fetchInfo.fetched} of {fetchInfo.total} available tickets
-                    {fetchInfo.total > fetchInfo.fetched && (
-                      <span className="ml-1">({fetchInfo.total - fetchInfo.fetched} more available)</span>
-                    )}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="rules" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Validation Rules</CardTitle>
-              <CardDescription>Customize the criteria used to validate Jira tickets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="validation-rules">Validation Criteria</Label>
-                <Textarea
-                  id="validation-rules"
-                  placeholder="Enter your validation rules..."
-                  value={validationRules}
-                  onChange={(e) => setValidationRules(e.target.value)}
-                  rows={12}
-                />
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+                <p>{error}</p>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            )}
 
-        <TabsContent value="tickets" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-semibold">Fetched Tickets</h2>
-              {fetchInfo && (
-                <p className="text-sm text-muted-foreground">
-                  Showing {fetchInfo.fetched} of {fetchInfo.total} total tickets
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={refreshTickets}
-                disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
-                className="flex items-center gap-2 bg-transparent"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-                {isLoading ? "Refreshing..." : "Refresh Tickets"}
-              </Button>
-              <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
-                {isLoading ? "Validating..." : "Validate All Tickets"}
-              </Button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-800 text-sm">{error}</p>
-            </div>
-          )}
-
-          <div className="grid gap-4">
-            {tickets.map((ticket) => (
-              <Card key={ticket.key}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{ticket.key}</CardTitle>
-                      <CardDescription>{ticket.summary}</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{ticket.priority}</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openTicketInJira(ticket.key)}
-                        className="h-8 w-8 p-0"
-                        title="Open in Jira"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-3">{ticket.description}</p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <Badge variant="secondary">{ticket.status}</Badge>
-                    <Badge variant="outline">Reporter: {ticket.reporter}</Badge>
-                    {ticket.assignee && <Badge variant="outline">Assignee: {ticket.assignee}</Badge>}
-                    {ticket.labels && ticket.labels.length > 0 && (
-                      <>
-                        {ticket.labels.map((label) => (
-                          <Badge key={label} variant="outline" className="bg-blue-50 text-blue-700">
-                            {label}
-                          </Badge>
-                        ))}
-                      </>
-                    )}
-                    {ticket.components && ticket.components.length > 0 && (
-                      <>
-                        {ticket.components.map((component) => (
-                          <Badge key={component} variant="outline" className="bg-green-50 text-green-700">
-                            {component}
-                          </Badge>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="results" className="space-y-4">
-          <h2 className="text-2xl font-semibold">Validation Results</h2>
-
-          <div className="grid gap-4">
-            {validationResults.map((result) => (
-              <Card key={result.ticket.key}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(result.isValid, result.score)}
+            <div className="grid gap-4">
+              {tickets.map((ticket) => (
+                <Card key={ticket.key} className="shadow-sm border border-gray-200 rounded-lg">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg">{result.ticket.key}</CardTitle>
-                        <CardDescription>{result.ticket.summary}</CardDescription>
+                        <CardTitle className="text-lg font-semibold text-gray-800">{ticket.key}</CardTitle>
+                        <CardDescription className="text-gray-600">{ticket.summary}</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="border-gray-300 text-gray-700">
+                          {ticket.priority}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openTicketInJira(ticket.key)}
+                          className="h-8 w-8 p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                          title="Open in Jira"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={getStatusColor(result.isValid, result.score)}>Score: {result.score}/10</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openTicketInJira(result.ticket.key)}
-                        className="h-8 w-8 p-0"
-                        title="Open in Jira"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-700 line-clamp-3">{ticket.description}</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-700 border border-gray-200">
+                        {ticket.status}
+                      </Badge>
+                      <Badge variant="outline" className="border-gray-300 text-gray-700">
+                        Reporter: {ticket.reporter}
+                      </Badge>
+                      {ticket.assignee && (
+                        <Badge variant="outline" className="border-gray-300 text-gray-700">
+                          Assignee: {ticket.assignee}
+                        </Badge>
+                      )}
+                      {ticket.labels && ticket.labels.length > 0 && (
+                        <>
+                          {ticket.labels.map((label) => (
+                            <Badge
+                              key={label}
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border border-blue-200"
+                            >
+                              {label}
+                            </Badge>
+                          ))}
+                        </>
+                      )}
+                      {ticket.components && ticket.components.length > 0 && (
+                        <>
+                          {ticket.components.map((component) => (
+                            <Badge
+                              key={component}
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border border-green-200"
+                            >
+                              {component}
+                            </Badge>
+                          ))}
+                        </>
+                      )}
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {result.issues.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-red-600 mb-2">Issues Found:</h4>
-                      <ul className="list-disc list-inside space-y-1">
-                        {result.issues.map((issue, index) => (
-                          <li key={index} className="text-sm text-red-600">
-                            {issue}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
 
-                  {result.suggestions.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-blue-600 mb-2">Suggestions:</h4>
-                      <ul className="list-disc list-inside space-y-1">
-                        {result.suggestions.map((suggestion, index) => (
-                          <li key={index} className="text-sm text-blue-600">
-                            {suggestion}
-                          </li>
-                        ))}
-                      </ul>
+          <TabsContent value="results" className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Validation Results</h2>
+
+            <div className="grid gap-4">
+              {validationResults.map((result) => (
+                <Card key={result.ticket.key} className="shadow-sm border border-gray-200 rounded-lg">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(result.isValid, result.score)}
+                        <div>
+                          <CardTitle className="text-lg font-semibold text-gray-800">{result.ticket.key}</CardTitle>
+                          <CardDescription className="text-gray-600">{result.ticket.summary}</CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(result.isValid, result.score)}>Score: {result.score}/10</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openTicketInJira(result.ticket.key)}
+                          className="h-8 w-8 p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                          title="Open in Jira"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {result.issues.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-red-600 mb-2">Issues Found:</h4>
+                        <ul className="list-disc list-inside space-y-1">
+                          {result.issues.map((issue, index) => (
+                            <li key={index} className="text-sm text-red-600">
+                              {issue}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {result.suggestions.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-blue-600 mb-2">Suggestions:</h4>
+                        <ul className="list-disc list-inside space-y-1">
+                          {result.suggestions.map((suggestion, index) => (
+                            <li key={index} className="text-sm text-blue-600">
+                              {suggestion}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
