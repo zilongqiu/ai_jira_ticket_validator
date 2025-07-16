@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle, ExternalLink } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle, ExternalLink, RefreshCw } from "lucide-react"
 
 interface JiraTicket {
   key: string
@@ -87,6 +87,43 @@ export default function JiraTicketValidator() {
       console.log(`Successfully loaded ${data.tickets?.length || data.length} tickets`)
     } catch (error) {
       console.error("Error fetching tickets:", error)
+      setError(error instanceof Error ? error.message : "An unexpected error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const refreshTickets = async () => {
+    // Check if configuration is complete
+    if (!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject) {
+      setError("Please complete the configuration before refreshing tickets")
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+    setFetchInfo(null)
+
+    try {
+      const response = await fetch("/api/jira/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery, maxResults }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to refresh tickets")
+      }
+
+      setTickets(data.tickets || data)
+      setFetchInfo(data.total !== undefined ? { total: data.total, fetched: data.fetched } : null)
+      // Clear validation results when refreshing tickets
+      setValidationResults([])
+      console.log(`Successfully refreshed ${data.tickets?.length || data.length} tickets`)
+    } catch (error) {
+      console.error("Error refreshing tickets:", error)
       setError(error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsLoading(false)
@@ -303,10 +340,27 @@ export default function JiraTicketValidator() {
                 </p>
               )}
             </div>
-            <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
-              {isLoading ? "Validating..." : "Validate All Tickets"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={refreshTickets}
+                disabled={!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject || isLoading}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                {isLoading ? "Refreshing..." : "Refresh Tickets"}
+              </Button>
+              <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
+                {isLoading ? "Validating..." : "Validate All Tickets"}
+              </Button>
+            </div>
           </div>
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
 
           <div className="grid gap-4">
             {tickets.map((ticket) => (
