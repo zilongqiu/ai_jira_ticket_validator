@@ -8,7 +8,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle, ExternalLink, RefreshCw } from "lucide-react"
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Settings,
+  HelpCircle,
+  ExternalLink,
+  RefreshCw,
+  FileText,
+  Ticket,
+  BarChart3,
+} from "lucide-react"
 
 interface JiraTicket {
   key: string
@@ -182,18 +193,25 @@ export default function JiraTicketValidator() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="config" className="flex items-center gap-2">
+          <TabsTrigger value="config" className="flex items-center gap-1">
             <Settings className="h-4 w-4" />
             Configuration
           </TabsTrigger>
-          <TabsTrigger value="tickets">
+          <TabsTrigger value="rules" className="flex items-center gap-1">
+            <FileText className="h-4 w-4" />
+            Validation Rules
+          </TabsTrigger>
+          <TabsTrigger value="tickets" className="flex items-center gap-1">
+            <Ticket className="h-4 w-4" />
             Tickets ({tickets.length})
             {fetchInfo && fetchInfo.total > fetchInfo.fetched && (
-              <span className="text-xs text-muted-foreground ml-1">of {fetchInfo.total}</span>
+              <span className="text-xs text-muted-foreground">of {fetchInfo.total}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="results">Results ({validationResults.length})</TabsTrigger>
-          <TabsTrigger value="rules">Validation Rules</TabsTrigger>
+          <TabsTrigger value="results" className="flex items-center gap-1">
+            <BarChart3 className="h-4 w-4" />
+            Results ({validationResults.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="config" className="space-y-6">
@@ -326,6 +344,30 @@ export default function JiraTicketValidator() {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Validation Rules</CardTitle>
+              <CardDescription>Customize the criteria used to validate Jira tickets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="validation-rules">Validation Criteria</Label>
+                <Textarea
+                  id="validation-rules"
+                  placeholder="Enter your validation rules..."
+                  value={validationRules}
+                  onChange={(e) => setValidationRules(e.target.value)}
+                  rows={12}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -475,30 +517,6 @@ export default function JiraTicketValidator() {
               </Card>
             ))}
           </div>
-        </TabsContent>
-
-        <TabsContent value="rules" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Validation Rules</CardTitle>
-              <CardDescription>Customize the criteria used to validate Jira tickets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="validation-rules">Validation Criteria</Label>
-                <Textarea
-                  id="validation-rules"
-                  placeholder="Enter your validation rules..."
-                  value={validationRules}
-                  onChange={(e) => setValidationRules(e.target.value)}
-                  rows={12}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
-              </p>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
