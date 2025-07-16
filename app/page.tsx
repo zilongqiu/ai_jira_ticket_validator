@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, Settings, HelpCircle, ExternalLink } from "lucide-react"
 
 interface JiraTicket {
   key: string
@@ -128,6 +128,14 @@ export default function JiraTicketValidator() {
     return "bg-red-100 text-red-800"
   }
 
+  const openTicketInJira = (ticketKey: string) => {
+    if (jiraUrl && ticketKey) {
+      const cleanUrl = jiraUrl.replace(/\/$/, "")
+      const ticketUrl = `${cleanUrl}/browse/${ticketKey}`
+      window.open(ticketUrl, "_blank", "noopener,noreferrer")
+    }
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-8">
@@ -183,7 +191,7 @@ export default function JiraTicketValidator() {
                   <Label htmlFor="jira-username">Username</Label>
                   <Input
                     id="jira-username"
-                    placeholder="your.username"
+                    placeholder="Your Jira username"
                     value={jiraUsername}
                     onChange={(e) => setJiraUsername(e.target.value)}
                   />
@@ -309,7 +317,18 @@ export default function JiraTicketValidator() {
                       <CardTitle className="text-lg">{ticket.key}</CardTitle>
                       <CardDescription>{ticket.summary}</CardDescription>
                     </div>
-                    <Badge variant="outline">{ticket.priority}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{ticket.priority}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTicketInJira(ticket.key)}
+                        className="h-8 w-8 p-0"
+                        title="Open in Jira"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -358,8 +377,17 @@ export default function JiraTicketValidator() {
                         <CardDescription>{result.ticket.summary}</CardDescription>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <Badge className={getStatusColor(result.isValid, result.score)}>Score: {result.score}/10</Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTicketInJira(result.ticket.key)}
+                        className="h-8 w-8 p-0"
+                        title="Open in Jira"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
