@@ -19,6 +19,8 @@ interface JiraTicket {
   assignee?: string
   reporter: string
   created: string
+  labels?: string[]
+  components?: string[]
 }
 
 interface ValidationResult {
@@ -82,7 +84,7 @@ export default function JiraTicketValidator() {
       setTickets(data.tickets || data)
       setFetchInfo(data.total !== undefined ? { total: data.total, fetched: data.fetched } : null)
       setActiveTab("tickets")
-      console.log(`Successfully loaded ${data.length} tickets`)
+      console.log(`Successfully loaded ${data.tickets?.length || data.length} tickets`)
     } catch (error) {
       console.error("Error fetching tickets:", error)
       setError(error instanceof Error ? error.message : "An unexpected error occurred")
@@ -316,6 +318,24 @@ export default function JiraTicketValidator() {
                     <Badge variant="secondary">{ticket.status}</Badge>
                     <Badge variant="outline">Reporter: {ticket.reporter}</Badge>
                     {ticket.assignee && <Badge variant="outline">Assignee: {ticket.assignee}</Badge>}
+                    {ticket.labels && ticket.labels.length > 0 && (
+                      <>
+                        {ticket.labels.map((label) => (
+                          <Badge key={label} variant="outline" className="bg-blue-50 text-blue-700">
+                            {label}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                    {ticket.components && ticket.components.length > 0 && (
+                      <>
+                        {ticket.components.map((component) => (
+                          <Badge key={component} variant="outline" className="bg-green-50 text-green-700">
+                            {component}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>

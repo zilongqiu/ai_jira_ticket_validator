@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
     const jql = jqlQuery && jqlQuery.trim() ? jqlQuery.trim() : `project=${jiraProject} ORDER BY created DESC`
 
     // Handle maxResults - if "all" is selected, use a very high number (Jira's max is typically 1000)
-    const resultsLimit = maxResults === "all" ? 1000 : Number.parseInt(maxResults) || 50
+    const resultsLimit = maxResults === "all" ? 1000 : Number.parseInt(maxResults) || 10
 
     // Prepare the API endpoint
-    const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=key,summary,description,priority,status,assignee,reporter,created`
+    const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${resultsLimit}&fields=key,summary,description,priority,status,assignee,reporter,created,labels,components`
 
     // Create authorization header using username:password
     const auth = Buffer.from(`${jiraUsername}:${jiraPassword}`).toString("base64")
@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
     const response = await fetch(apiUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Basic ${auth}`,
-        "Accept": "application/json",
+        Authorization: `Basic ${auth}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
       },
     })
 
@@ -92,6 +93,8 @@ export async function POST(request: NextRequest) {
         assignee: issue.fields.assignee?.displayName || issue.fields.assignee?.name,
         reporter: issue.fields.reporter?.displayName || issue.fields.reporter?.name || "Unknown",
         created: issue.fields.created || new Date().toISOString(),
+        labels: issue.fields.labels || [],
+        components: issue.fields.components?.map((comp: any) => comp.name) || [],
       }
     })
 
