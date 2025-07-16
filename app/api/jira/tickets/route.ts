@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const { jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery } = await request.json()
+    const { jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery, maxResults } = await request.json()
 
     // Validate required parameters
     if (!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject) {
@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
     // Use custom JQL query if provided, otherwise use default
     const jql = jqlQuery && jqlQuery.trim() ? jqlQuery.trim() : `project=${jiraProject} ORDER BY created DESC`
 
-    const maxResults = 10 // Increased limit for more flexibility
+    // Handle maxResults - if "all" is selected, use a very high number (Jira's max is typically 1000)
+    const resultsLimit = maxResults === "all" ? 1000 : Number.parseInt(maxResults) || 50
 
     // Prepare the API endpoint
     const apiUrl = `${cleanJiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=key,summary,description,priority,status,assignee,reporter,created`
@@ -94,8 +95,12 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log(`Successfully fetched ${tickets.length} tickets from Jira`)
-    return NextResponse.json(tickets)
+    const totalAvailable = data.total || tickets.length
+    return NextResponse.json({
+      tickets,
+      total: totalAvailable,
+      fetched: tickets.length,
+    })
   } catch (error) {
     console.error("Error fetching Jira tickets:", error)
     return NextResponse.json(

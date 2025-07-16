@@ -35,6 +35,7 @@ export default function JiraTicketValidator() {
   const [jiraPassword, setJiraPassword] = useState("")
   const [jiraProject, setJiraProject] = useState("")
   const [jqlQuery, setJqlQuery] = useState("")
+  const [maxResults, setMaxResults] = useState("10")
   const [validationRules, setValidationRules] = useState(
       `
 - Title must be clear and descriptive
@@ -50,6 +51,7 @@ export default function JiraTicketValidator() {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("config")
   const [error, setError] = useState<string>("")
+  const [fetchInfo, setFetchInfo] = useState<{ total: number; fetched: number } | null>(null)
 
   // JQL query examples for the placeholder
   const getJqlPlaceholder = () => {
@@ -62,12 +64,13 @@ export default function JiraTicketValidator() {
   const fetchTickets = async () => {
     setIsLoading(true)
     setError("")
+    setFetchInfo(null)
 
     try {
       const response = await fetch("/api/jira/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery }),
+        body: JSON.stringify({ jiraUrl, jiraUsername, jiraPassword, jiraProject, jqlQuery, maxResults }),
       })
 
       const data = await response.json()
@@ -76,7 +79,8 @@ export default function JiraTicketValidator() {
         throw new Error(data.error || "Failed to fetch tickets")
       }
 
-      setTickets(data)
+      setTickets(data.tickets || data)
+      setFetchInfo(data.total !== undefined ? { total: data.total, fetched: data.fetched } : null)
       setActiveTab("tickets")
       console.log(`Successfully loaded ${data.length} tickets`)
     } catch (error) {
@@ -135,7 +139,12 @@ export default function JiraTicketValidator() {
             <Settings className="h-4 w-4" />
             Configuration
           </TabsTrigger>
-          <TabsTrigger value="tickets">Tickets ({tickets.length})</TabsTrigger>
+          <TabsTrigger value="tickets">
+            Tickets ({tickets.length})
+            {fetchInfo && fetchInfo.total > fetchInfo.fetched && (
+              <span className="text-xs text-muted-foreground ml-1">of {fetchInfo.total}</span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="results">Results ({validationResults.length})</TabsTrigger>
           <TabsTrigger value="rules">Validation Rules</TabsTrigger>
         </TabsList>
@@ -189,40 +198,63 @@ export default function JiraTicketValidator() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="jql-query">JQL Query (Optional)</Label>
-                  <div className="group relative">
-                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                      Leave empty to use default query for the project
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="jql-query">JQL Query (Optional)</Label>
+                    <div className="group relative">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                        Leave empty to use default query for the project
+                      </div>
                     </div>
                   </div>
+                  <Textarea
+                    id="jql-query"
+                    placeholder={getJqlPlaceholder()}
+                    value={jqlQuery}
+                    onChange={(e) => setJqlQuery(e.target.value)}
+                    rows={3}
+                  />
                 </div>
-                <Textarea
-                  id="jql-query"
-                  placeholder={getJqlPlaceholder()}
-                  value={jqlQuery}
-                  onChange={(e) => setJqlQuery(e.target.value)}
-                  rows={3}
-                />
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>
-                    <strong>Examples:</strong>
-                  </p>
-                  <p>
-                    • <code>project=PROJ AND status != Done ORDER BY created DESC</code>
-                  </p>
-                  <p>
-                    • <code>project=PROJ AND priority=High AND assignee=currentUser()</code>
-                  </p>
-                  <p>
-                    • <code>project=PROJ AND created {">"} -7d AND status IN (Open, "In Progress")</code>
-                  </p>
-                  <p>
-                    • <code>project=PROJ AND labels=bug ORDER BY priority DESC</code>
+                <div className="space-y-2">
+                  <Label htmlFor="max-results">Max Results</Label>
+                  <select
+                    id="max-results"
+                    value={maxResults}
+                    onChange={(e) => setMaxResults(e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="10">10 tickets</option>
+                    <option value="20">20 tickets</option>
+                    <option value="50">50 tickets</option>
+                    <option value="100">100 tickets</option>
+                    <option value="all">All tickets</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    {maxResults === "all"
+                      ? "Fetches up to 1000 tickets (Jira's maximum)"
+                      : `Fetches up to ${maxResults} tickets`}
                   </p>
                 </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>
+                  <strong>JQL Examples:</strong>
+                </p>
+                <p>
+                  • <code>project=PROJ AND status != Done ORDER BY created DESC</code>
+                </p>
+                <p>
+                  • <code>project=PROJ AND priority=High AND assignee=currentUser()</code>
+                </p>
+                <p>
+                  • <code>project=PROJ AND created {">"} -7d AND status IN (Open, "In Progress")</code>
+                </p>
+                <p>
+                  • <code>project=PROJ AND labels=bug ORDER BY priority DESC</code>
+                </p>
               </div>
 
               <Button
@@ -237,13 +269,30 @@ export default function JiraTicketValidator() {
                   <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
+              {fetchInfo && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-blue-800 text-sm">
+                    Fetched {fetchInfo.fetched} of {fetchInfo.total} available tickets
+                    {fetchInfo.total > fetchInfo.fetched && (
+                      <span className="ml-1">({fetchInfo.total - fetchInfo.fetched} more available)</span>
+                    )}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold">Fetched Tickets</h2>
+            <div>
+              <h2 className="text-2xl font-semibold">Fetched Tickets</h2>
+              {fetchInfo && (
+                <p className="text-sm text-muted-foreground">
+                  Showing {fetchInfo.fetched} of {fetchInfo.total} total tickets
+                </p>
+              )}
+            </div>
             <Button onClick={validateTickets} disabled={tickets.length === 0 || isLoading}>
               {isLoading ? "Validating..." : "Validate All Tickets"}
             </Button>
