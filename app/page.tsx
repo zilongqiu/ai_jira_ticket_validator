@@ -20,9 +20,9 @@ import {
   FileText,
   Ticket,
   BarChart3,
-  Download,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react"
 
 interface JiraTicket {
@@ -90,6 +90,15 @@ export default function JiraTicketValidator() {
 - Must have clear business value for features
 `.trim(),
   )
+  const [productRequirements, setProductRequirements] = useState(
+    `
+- As a user, I want to be able to log in securely using my email and password.
+- The system should support two-factor authentication for enhanced security.
+- The dashboard should display a summary of my recent activity and key metrics.
+- Users must be able to update their profile information, including name and contact details.
+- The application must be responsive and work well on desktop, tablet, and mobile devices.
+`.trim(),
+  )
 
   const [tickets, setTickets] = useState<JiraTicket[]>([])
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([])
@@ -108,6 +117,9 @@ export default function JiraTicketValidator() {
   const [filterStatus, setFilterStatus] = useState("")
   const [filterPriority, setFilterPriority] = useState("")
   const [filterAssignee, setFilterAssignee] = useState("")
+
+  // New state for individual ticket re-validation loading
+  const [revalidatingTicketKey, setRevalidatingTicketKey] = useState<string | null>(null)
 
   // Effect to select all tickets by default when new tickets are fetched
   useEffect(() => {
@@ -187,7 +199,7 @@ export default function JiraTicketValidator() {
       const response = await fetch("/api/validate-tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tickets: ticketsToValidate, validationRules }),
+        body: JSON.stringify({ tickets: ticketsToValidate, validationRules, productRequirements }),
       })
 
       if (!response.ok) throw new Error("Failed to validate tickets")
@@ -202,6 +214,80 @@ export default function JiraTicketValidator() {
       setIsLoading(false)
     }
   }
+
+  const refreshAndRevalidateSingleTicket = useCallback(
+    async (ticketKey: string) => {
+      if (!jiraUrl || !jiraUsername || !jiraPassword || !jiraProject) {
+        setError("Please complete the Jira configuration first.")
+        return
+      }
+
+      setRevalidatingTicketKey(ticketKey)
+      setError("")
+
+      try {
+        // 1. Fetch the latest ticket data from Jira
+        const jiraResponse = await fetch("/api/jira/tickets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jiraUrl,
+            jiraUsername,
+            jiraPassword,
+            jiraProject,
+            jqlQuery: `key = "${ticketKey}"`, // Fetch only this specific ticket
+            maxResults: "1",
+          }),
+        })
+
+        const jiraData = await jiraResponse.json()
+
+        if (!jiraResponse.ok || !jiraData.tickets || jiraData.tickets.length === 0) {
+          throw new Error(jiraData.error || `Failed to fetch ticket ${ticketKey} from Jira.`)
+        }
+
+        const latestTicket = jiraData.tickets[0]
+
+        // 2. Re-validate the ticket with AI
+        const validateResponse = await fetch("/api/validate-tickets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tickets: [latestTicket], // Validate only the single fetched ticket
+            validationRules,
+            productRequirements,
+          }),
+        })
+
+        const validationData = await validateResponse.json()
+
+        if (!validateResponse.ok || !validationData || validationData.length === 0) {
+          throw new Error(validationData.error || `Failed to re-validate ticket ${ticketKey}.`)
+        }
+
+        const newResult = validationData[0]
+
+        // 3. Update the validationResults state
+        setValidationResults((prevResults) => {
+          const existingIndex = prevResults.findIndex((r) => r.ticket.key === ticketKey)
+          if (existingIndex !== -1) {
+            const updatedResults = [...prevResults]
+            updatedResults[existingIndex] = newResult
+            return updatedResults
+          } else {
+            // If for some reason it wasn't there, add it (e.g., if it was filtered out before)
+            return [...prevResults, newResult]
+          }
+        })
+      } catch (err) {
+        console.error(`Error re-validating ticket ${ticketKey}:`, err)
+        setError(err instanceof Error ? err.message : `An unexpected error occurred while re-validating ${ticketKey}.`)
+      } finally {
+        setRevalidatingTicketKey(null)
+      }
+    },
+    [jiraUrl, jiraUsername, jiraPassword, jiraProject, validationRules, productRequirements],
+  )
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -296,6 +382,13 @@ export default function JiraTicketValidator() {
             >
               <FileText className="h-4 w-4" />
               Validation Rules
+            </TabsTrigger>
+            <TabsTrigger
+              value="requirements"
+              className="flex items-center gap-2 px-6 py-3 text-base font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Product Requirements
             </TabsTrigger>
             <TabsTrigger
               value="tickets"
@@ -491,6 +584,39 @@ export default function JiraTicketValidator() {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
                   Define your validation criteria as bullet points. The AI will use these rules to evaluate each ticket.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="requirements" className="space-y-4">
+            {" "}
+            {/* New Tab Content */}
+            <Card className="shadow-sm border border-gray-200 rounded-lg bg-white">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-gray-800">Product Requirements</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Input the product requirements. The AI will check for mismatches between these requirements and the
+                  ticket information.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="product-requirements" className="text-gray-700">
+                    Feature Requirements
+                  </Label>
+                  <Textarea
+                    id="product-requirements"
+                    placeholder="Enter your product requirements here, e.g., 'As a user, I want to...', 'The system must support...'"
+                    value={productRequirements}
+                    onChange={(e) => setProductRequirements(e.target.value)}
+                    rows={12}
+                    className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  Provide detailed product requirements. The AI will use these to identify if ticket details align with
+                  the expected features.
                 </p>
               </CardContent>
             </Card>
@@ -743,6 +869,18 @@ export default function JiraTicketValidator() {
                             title="Open in Jira"
                           >
                             <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refreshAndRevalidateSingleTicket(result.ticket.key)}
+                            disabled={revalidatingTicketKey === result.ticket.key || isLoading}
+                            className="flex items-center gap-1 border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+                            title="Refresh & Re-validate"
+                          >
+                            <RefreshCw
+                              className={`h-4 w-4 ${revalidatingTicketKey === result.ticket.key ? "animate-spin" : ""}`}
+                            />
                           </Button>
                         </div>
                       </div>
