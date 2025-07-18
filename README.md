@@ -27,7 +27,7 @@ This app uses a **OpenAI LLM with gpt-4o-mini model** to process each ticket aga
 
 ## ✅ Demo
 
-1. Access [http://localhost:3000/](http://localhost:3000/)
+1. Access [http://localhost:3000/](http://localhost:3000/) and add your Jira access "Configuration" (ex: Jira URL, Project Key, etc)
    ![Demo](./screenshots/screenshot_0.png "Demo")
 
 
@@ -35,15 +35,15 @@ This app uses a **OpenAI LLM with gpt-4o-mini model** to process each ticket aga
    ![Demo1](./screenshots/screenshot_1.png "Demo1")
 
 
-3. Add your Jira access "Configuration" (ex: Jira URL, Project Key, etc)
+3. Add your Product Requirements
    ![Dem02](./screenshots/screenshot_2.png "Demo2")
 
 
-4. Click on "Fetch Tickets"
+4. Fetch Tickets
    ![Demo3](./screenshots/screenshot_3.png "Demo3")
 
 
-5. After seeing your tickets, click on "Validate All Tickets"
+5. Validate your Tickets
    ![Demo4](./screenshots/screenshot_4.png "Demo4")
 
 ---
