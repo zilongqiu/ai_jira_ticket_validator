@@ -67,7 +67,7 @@ npm run dev
 | Component         | Technology                                      |
 |-------------------|-------------------------------------------------|
 | Frontend UI       | NextJS                                          |
-| LLMs              | OpenAI / gpt-4o-mini (via API)                        |
+| LLMs              | OpenAI / gpt-4 (via API)                        |
 
 ![2025](./screenshots/ai_2025.webp "2025")
 

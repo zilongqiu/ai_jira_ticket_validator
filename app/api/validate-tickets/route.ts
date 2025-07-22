@@ -28,21 +28,37 @@ ${productRequirements}`
         const validationInstruction = productRequirements ? "rules and product requirements" : "rules"
 
         const { text } = await generateText({
-          model: openai("gpt-4o-mini"),
-          system: `You are an expert Jira ticket validator. Analyze the given ticket against the provided validation rules and product requirements (if provided).
-Return a JSON response with the following structure:
+          model: openai("gpt-4"),
+          system: `You are a precise Jira ticket validator. You must analyze tickets against SPECIFIC, MEASURABLE criteria only.
+
+**CRITICAL INSTRUCTIONS:**
+1. **Be Specific & Measurable**: Only flag issues that violate specific, quantifiable rules (character counts, required sections, etc.)
+2. **Avoid Subjective Judgments**: Do not suggest improvements for "clarity" or "better descriptions" unless they violate specific criteria
+3. **Check Actual Content**: Before flagging missing sections, verify they don't exist with different wording (e.g., "Acceptance Criteria" vs "AC" vs "Requirements")
+4. **One Issue Per Field**: If a field meets the basic requirements, don't suggest additional improvements
+5. **Context Awareness**: Consider the ticket type (bug vs feature vs task) when applying rules
+
+**VALIDATION APPROACH:**
+- Title: Check length (10-80 chars), format, specificity
+- Description: Check length (50+ chars), required sections based on ticket type
+- Priority: Validate against severity criteria
+- Status/Assignment: Check logical consistency
+- Only flag CLEAR violations of stated rules
+
+**SCORING GUIDELINES:**
+- 9-10: Meets all specific criteria perfectly
+- 7-8: Minor violations of 1-2 non-critical criteria  
+- 5-6: Missing 1-2 required elements
+- 3-4: Multiple missing required elements
+- 1-2: Severely incomplete or violates multiple critical criteria
+
+Return JSON:
 {
   "isValid": boolean,
   "score": number (1-10),
-  "issues": ["list of specific issues found"],
-  "suggestions": ["list of specific improvement suggestions"]
-}
-
-**Crucial Directives for Trustworthy Feedback:**
-1.  **Actionable & Unique Suggestions:** Provide highly actionable, unique, and definitive suggestions. Each suggestion must aim to resolve an identified issue completely.
-2.  **Avoid Repetition:** **Do not provide suggestions that are similar to previously given feedback if the underlying issue appears to have been addressed in the current ticket content.** Focus only on new or remaining issues.
-3.  **Score Adjustment:** If the ticket's content has clearly improved or addressed previous feedback (based on the current ticket details), reflect this by assigning a higher score.
-4.  **Root Cause Focus:** Focus on the root cause of issues and offer clear, distinct steps for improvement.`,
+  "issues": ["specific rule violations only"],
+  "suggestions": ["specific, actionable fixes for violations only which fulfill ALL above VALIDATION APPROACH defined"]
+}`,
           prompt: `
 Validation Rules:
 ${validationRules}
@@ -58,7 +74,7 @@ Reporter: ${ticket.reporter}
 Assignee: ${ticket.assignee || "Unassigned"}
 Created: ${ticket.created}
 
-Please validate this ticket against the ${validationInstruction} and provide detailed feedback.`,
+Analyze this ticket against the specific ${validationInstruction}. Only report violations of explicit criteria. Do not suggest improvements for fields that meet the minimum requirements.`,
         })
 
         try {
@@ -76,8 +92,8 @@ Please validate this ticket against the ${validationInstruction} and provide det
             ticket,
             isValid: false,
             score: 0,
-            issues: ["Failed to analyze ticket"],
-            suggestions: ["Please try validating again"],
+            issues: ["Failed to analyze ticket - please try again"],
+            suggestions: ["Re-run validation to get proper analysis"],
           }
         }
       }),

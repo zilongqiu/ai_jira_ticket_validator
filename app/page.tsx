@@ -83,11 +83,34 @@ export default function JiraTicketValidator() {
   const [maxResults, setMaxResults] = useState("10")
   const [validationRules, setValidationRules] = useState(
     `
-- Title must be clear and descriptive
-- Description must include acceptance criteria
-- Priority must be set appropriately
-- Should include steps to reproduce for bugs
-- Must have clear business value for features
+**Title/Summary Requirements:**
+- Must be 10-80 characters long
+- Should start with action verb (Add, Fix, Update, Remove, etc.) or user story format
+- Must not contain vague words like "issue", "problem", "bug" without specifics
+- Should include the component/feature being affected
+
+**Description Requirements:**
+- Must be at least 50 characters long
+- Must include "Acceptance Criteria" section with at least 2 specific criteria
+- For bugs: Must include "Steps to Reproduce", "Expected Result", "Actual Result"
+- For features: Must include "User Story" and "Business Value"
+- Should not contain placeholder text like "TBD", "TODO", "Fill this later"
+
+**Priority Assessment:**
+- Critical: System down, data loss, security breach
+- High: Major feature broken, affects many users
+- Medium: Minor feature issues, affects some users  
+- Low: Cosmetic issues, nice-to-have improvements
+
+**Status Validation:**
+- "To Do" tickets must have assignee or be in backlog
+- "In Progress" tickets must have assignee and recent activity
+- "Done" tickets must have resolution and completion date
+
+**Assignment Rules:**
+- High/Critical priority tickets must have assignee
+- Tickets in "In Progress" status must have assignee
+- Unassigned tickets should be in "To Do" or "Backlog" status
 `.trim(),
   )
   const [productRequirements, setProductRequirements] = useState(
