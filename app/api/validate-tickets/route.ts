@@ -111,7 +111,7 @@ Validate ONLY the ${fieldName} field against its specific rules.`,
   )
 
   // Calculate overall scores
-  const overallScore = Math.round(fieldResults.reduce((sum, field) => sum + field.score, 0) / fieldResults.length)
+  const overallScore = 0
   const isValid = fieldResults.every((field) => field.isValid) && overallScore >= 7
 
   return {
@@ -192,7 +192,6 @@ Analyze against ${validationInstruction}. Provide both overall and field-level r
       validationType: "full",
     }
   } catch (parseError) {
-    console.log(parseError)
     return {
       ticket,
       isValid: false,

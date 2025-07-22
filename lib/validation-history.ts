@@ -76,7 +76,7 @@ export class ValidationHistoryManager {
         const history = this.getHistory()
         const existingIndex = history.findIndex((entry) => entry.ticketKey === ticketKey)
 
-        const overallScore = Math.round(fieldResults.reduce((sum, field) => sum + field.score, 0) / fieldResults.length)
+        const overallScore = Math.floor(fieldResults.reduce((sum, field) => sum + field.score, 0) / fieldResults.length)
         const isValid = fieldResults.every((field) => field.isValid) && overallScore >= 7
 
         const newEntry: ValidationHistoryEntry = {

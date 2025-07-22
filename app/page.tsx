@@ -279,7 +279,7 @@ export default function JiraTicketValidator() {
               // Update history
               ValidationHistoryManager.updateTicketHistory(ticket.key, currentSnapshot, mergedFieldResults)
 
-              const overallScore = Math.round(
+              const overallScore = Math.floor(
                 mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
               )
               const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
@@ -433,7 +433,7 @@ export default function JiraTicketValidator() {
             // Update history with new snapshot and merged results
             ValidationHistoryManager.updateTicketHistory(ticketKey, currentSnapshot, mergedFieldResults)
 
-            const overallScore = Math.round(
+            const overallScore = Math.floor(
               mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
             )
             const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
