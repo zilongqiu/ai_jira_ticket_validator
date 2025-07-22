@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ValidationHistoryManager } from "@/lib/validation-history"
 import {
   AlertCircle,
   CheckCircle,
@@ -23,6 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  History,
+  Zap,
 } from "lucide-react"
 
 interface JiraTicket {
@@ -44,6 +47,10 @@ interface ValidationResult {
   score: number
   issues: string[]
   suggestions: string[]
+  fieldResults?: any[]
+  validationType?: string
+  changedFields?: string[]
+  cachedFields?: string[]
 }
 
 // Simple skeleton component for tickets
@@ -218,17 +225,107 @@ export default function JiraTicketValidator() {
 
     setIsLoading(true)
     setError("")
+
     try {
-      const response = await fetch("/api/validate-tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tickets: ticketsToValidate, validationRules, productRequirements }),
-      })
+      const validationResults = await Promise.all(
+        ticketsToValidate.map(async (ticket) => {
+          const currentSnapshot = ValidationHistoryManager.createTicketSnapshot(ticket)
+          const previousHistory = ValidationHistoryManager.getTicketHistory(ticket.key)
 
-      if (!response.ok) throw new Error("Failed to validate tickets")
+          if (previousHistory) {
+            // Check for changes
+            const changedFields = ValidationHistoryManager.detectChangedFields(
+              currentSnapshot,
+              previousHistory.snapshot,
+            )
 
-      const results = await response.json()
-      setValidationResults(results)
+            if (changedFields.length === 0) {
+              // No changes - return cached results
+              return {
+                ticket,
+                isValid: previousHistory.isValid,
+                score: previousHistory.overallScore,
+                issues: previousHistory.fieldResults.flatMap((f) => f.issues),
+                suggestions: previousHistory.fieldResults.flatMap((f) => f.suggestions),
+                fieldResults: previousHistory.fieldResults,
+                validationType: "cached",
+                changedFields: [],
+                cachedFields: previousHistory.fieldResults.map((f) => f.field),
+              }
+            } else {
+              // Validate only changed fields
+              const response = await fetch("/api/validate-tickets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  tickets: [ticket],
+                  validationRules,
+                  productRequirements,
+                  fieldsToValidate: changedFields,
+                }),
+              })
+
+              if (!response.ok) throw new Error("Failed to validate changed fields")
+
+              const [newResult] = await response.json()
+
+              // Merge with previous results
+              const mergedFieldResults = ValidationHistoryManager.mergeValidationResults(
+                previousHistory.fieldResults,
+                newResult.fieldResults || [],
+                changedFields,
+              )
+
+              // Update history
+              ValidationHistoryManager.updateTicketHistory(ticket.key, currentSnapshot, mergedFieldResults)
+
+              const overallScore = Math.round(
+                mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
+              )
+              const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
+
+              return {
+                ticket,
+                isValid,
+                score: overallScore,
+                issues: mergedFieldResults.flatMap((f) => f.issues),
+                suggestions: mergedFieldResults.flatMap((f) => f.suggestions),
+                fieldResults: mergedFieldResults,
+                validationType: "partial",
+                changedFields,
+                cachedFields: previousHistory.fieldResults
+                  .filter((f) => !changedFields.includes(f.field))
+                  .map((f) => f.field),
+              }
+            }
+          } else {
+            // First time validation - validate all fields
+            const response = await fetch("/api/validate-tickets", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tickets: [ticket], validationRules, productRequirements }),
+            })
+
+            if (!response.ok) throw new Error("Failed to validate tickets")
+
+            const [result] = await response.json()
+
+            // Store in history
+            if (result.fieldResults) {
+              ValidationHistoryManager.updateTicketHistory(ticket.key, currentSnapshot, result.fieldResults)
+            }
+
+            return {
+              ...result,
+              validationType: "full",
+              changedFields: ["summary", "description", "priority", "status", "assignee"],
+              cachedFields: [],
+            }
+          }
+        }),
+      )
+
+      setValidationResults(validationResults)
       setActiveTab("results")
     } catch (error) {
       console.error("Error validating tickets:", error)
@@ -270,27 +367,120 @@ export default function JiraTicketValidator() {
         }
 
         const latestTicket = jiraData.tickets[0]
+        const currentSnapshot = ValidationHistoryManager.createTicketSnapshot(latestTicket)
+        const previousHistory = ValidationHistoryManager.getTicketHistory(ticketKey)
 
-        // 2. Re-validate the ticket with AI
-        const validateResponse = await fetch("/api/validate-tickets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tickets: [latestTicket], // Validate only the single fetched ticket
-            validationRules,
-            productRequirements,
-          }),
-        })
+        let newResult
 
-        const validationData = await validateResponse.json()
+        if (previousHistory) {
+          const changedFields = ValidationHistoryManager.detectChangedFields(currentSnapshot, previousHistory.snapshot)
 
-        if (!validateResponse.ok || !validationData || validationData.length === 0) {
-          throw new Error(validationData.error || `Failed to re-validate ticket ${ticketKey}.`)
+          if (changedFields.length === 0) {
+            // No changes detected - preserve existing results exactly as they are
+            const existingResult = validationResults.find((r) => r.ticket.key === ticketKey)
+
+            if (existingResult) {
+              // Update only the ticket data (in case of minor formatting changes that don't affect validation)
+              // but keep all validation results identical
+              newResult = {
+                ...existingResult,
+                ticket: latestTicket, // Update ticket data
+                validationType: "cached",
+                changedFields: [],
+                cachedFields: previousHistory.fieldResults.map((f) => f.field),
+              }
+            } else {
+              // Fallback: reconstruct from history if not in current results
+              newResult = {
+                ticket: latestTicket,
+                isValid: previousHistory.isValid,
+                score: previousHistory.overallScore,
+                issues: previousHistory.fieldResults.flatMap((f) => f.issues),
+                suggestions: previousHistory.fieldResults.flatMap((f) => f.suggestions),
+                fieldResults: previousHistory.fieldResults,
+                validationType: "cached",
+                changedFields: [],
+                cachedFields: previousHistory.fieldResults.map((f) => f.field),
+              }
+            }
+
+            // Don't update history since nothing changed
+          } else {
+            // Validate changed fields only
+            const validateResponse = await fetch("/api/validate-tickets", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tickets: [latestTicket],
+                validationRules,
+                productRequirements,
+                fieldsToValidate: changedFields,
+              }),
+            })
+
+            const validationData = await validateResponse.json()
+            if (!validateResponse.ok) throw new Error("Failed to re-validate ticket")
+
+            const [partialResult] = validationData
+
+            // Merge results
+            const mergedFieldResults = ValidationHistoryManager.mergeValidationResults(
+              previousHistory.fieldResults,
+              partialResult.fieldResults || [],
+              changedFields,
+            )
+
+            // Update history with new snapshot and merged results
+            ValidationHistoryManager.updateTicketHistory(ticketKey, currentSnapshot, mergedFieldResults)
+
+            const overallScore = Math.round(
+              mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
+            )
+            const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
+
+            newResult = {
+              ticket: latestTicket,
+              isValid,
+              score: overallScore,
+              issues: mergedFieldResults.flatMap((f) => f.issues),
+              suggestions: mergedFieldResults.flatMap((f) => f.suggestions),
+              fieldResults: mergedFieldResults,
+              validationType: "partial",
+              changedFields,
+              cachedFields: previousHistory.fieldResults
+                .filter((f) => !changedFields.includes(f.field))
+                .map((f) => f.field),
+            }
+          }
+        } else {
+          // Full validation for new ticket
+          const validateResponse = await fetch("/api/validate-tickets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tickets: [latestTicket],
+              validationRules,
+              productRequirements,
+            }),
+          })
+
+          const validationData = await validateResponse.json()
+          if (!validateResponse.ok) throw new Error("Failed to re-validate ticket")
+
+          newResult = {
+            ...validationData[0],
+            validationType: "full",
+            changedFields: ["summary", "description", "priority", "status", "assignee"],
+            cachedFields: [],
+          }
+
+          // Store in history
+          if (newResult.fieldResults) {
+            ValidationHistoryManager.updateTicketHistory(ticketKey, currentSnapshot, newResult.fieldResults)
+          }
         }
 
-        const newResult = validationData[0]
-
-        // 3. Update the validationResults state
+        // Update the validationResults state
         setValidationResults((prevResults) => {
           const existingIndex = prevResults.findIndex((r) => r.ticket.key === ticketKey)
           if (existingIndex !== -1) {
@@ -298,7 +488,6 @@ export default function JiraTicketValidator() {
             updatedResults[existingIndex] = newResult
             return updatedResults
           } else {
-            // If for some reason it wasn't there, add it (e.g., if it was filtered out before)
             return [...prevResults, newResult]
           }
         })
@@ -309,7 +498,7 @@ export default function JiraTicketValidator() {
         setRevalidatingTicketKey(null)
       }
     },
-    [jiraUrl, jiraUsername, jiraPassword, jiraProject, validationRules, productRequirements],
+    [jiraUrl, jiraUsername, jiraPassword, jiraProject, validationRules, productRequirements, validationResults],
   )
 
   const handleSelectAll = (checked: boolean) => {
@@ -343,6 +532,32 @@ export default function JiraTicketValidator() {
     if (isValid && score >= 8) return "bg-green-100 text-green-800"
     if (score >= 6) return "bg-yellow-100 text-yellow-800"
     return "bg-red-100 text-red-800"
+  }
+
+  const getValidationTypeIcon = (validationType: string) => {
+    switch (validationType) {
+      case "cached":
+        return <History className="h-4 w-4 text-gray-500" />
+      case "partial":
+        return <Zap className="h-4 w-4 text-blue-500" />
+      case "full":
+        return <RefreshCw className="h-4 w-4 text-green-500" />
+      default:
+        return null
+    }
+  }
+
+  const getValidationTypeLabel = (validationType: string) => {
+    switch (validationType) {
+      case "cached":
+        return "Cached (No Changes)"
+      case "partial":
+        return "Partial Re-validation"
+      case "full":
+        return "Full Validation"
+      default:
+        return "Unknown"
+    }
   }
 
   const openTicketInJira = (ticketKey: string) => {
@@ -613,8 +828,6 @@ export default function JiraTicketValidator() {
           </TabsContent>
 
           <TabsContent value="requirements" className="space-y-4">
-            {" "}
-            {/* New Tab Content */}
             <Card className="shadow-sm border border-gray-200 rounded-lg bg-white">
               <CardHeader>
                 <CardTitle className="text-2xl font-bold text-gray-800">Product Requirements</CardTitle>
@@ -861,11 +1074,18 @@ export default function JiraTicketValidator() {
           <TabsContent value="results" className="space-y-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-gray-800">Validation Results</h2>
+              <Button
+                variant="outline"
+                onClick={() => ValidationHistoryManager.clearHistory()}
+                className="text-red-600 border-red-300 hover:bg-red-50"
+              >
+                Clear History
+              </Button>
             </div>
 
             <div className="grid gap-4">
               {isLoading && validationResults.length === 0 ? (
-                Array.from({ length: 3 }).map((_, i) => <TicketSkeleton key={i} />) // Show some skeletons for results too
+                Array.from({ length: 3 }).map((_, i) => <TicketSkeleton key={i} />)
               ) : validationResults.length === 0 && !isLoading ? (
                 <p className="text-center text-gray-500 py-8">No validation results yet. Fetch and validate tickets.</p>
               ) : (
@@ -884,6 +1104,21 @@ export default function JiraTicketValidator() {
                           <Badge className={getStatusColor(result.isValid, result.score)}>
                             Score: {result.score}/10
                           </Badge>
+                          {result.validationType && (
+                            <div
+                              className="flex items-center gap-1"
+                              title={getValidationTypeLabel(result.validationType)}
+                            >
+                              {getValidationTypeIcon(result.validationType)}
+                              <span className="text-xs text-gray-500">
+                                {result.validationType === "cached"
+                                  ? "Cached"
+                                  : result.validationType === "partial"
+                                    ? "Partial"
+                                    : "Full"}
+                              </span>
+                            </div>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -907,6 +1142,28 @@ export default function JiraTicketValidator() {
                           </Button>
                         </div>
                       </div>
+
+                      {/* Show validation type details */}
+                      {(result.changedFields?.length > 0 || result.cachedFields?.length > 0) && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {result.changedFields?.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Zap className="h-3 w-3 text-blue-500" />
+                                <span className="text-blue-600">Re-validated:</span>
+                                <span className="text-blue-800">{result.changedFields.join(", ")}</span>
+                              </div>
+                            )}
+                            {result.cachedFields?.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <History className="h-3 w-3 text-gray-500" />
+                                <span className="text-gray-600">Cached:</span>
+                                <span className="text-gray-800">{result.cachedFields.join(", ")}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {result.issues.length > 0 && (
