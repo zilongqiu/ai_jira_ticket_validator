@@ -11,7 +11,6 @@ interface TicketSnapshot {
 
 interface FieldValidationResult {
     field: string
-    isValid: boolean
     score: number
     issues: string[]
     suggestions: string[]
@@ -23,7 +22,6 @@ interface ValidationHistoryEntry {
     snapshot: TicketSnapshot
     fieldResults: FieldValidationResult[]
     overallScore: number
-    isValid: boolean
     timestamp: string
 }
 
@@ -77,14 +75,12 @@ export class ValidationHistoryManager {
         const existingIndex = history.findIndex((entry) => entry.ticketKey === ticketKey)
 
         const overallScore = Math.floor(fieldResults.reduce((sum, field) => sum + field.score, 0) / fieldResults.length)
-        const isValid = fieldResults.every((field) => field.isValid) && overallScore >= 7
 
         const newEntry: ValidationHistoryEntry = {
             ticketKey,
             snapshot,
             fieldResults,
             overallScore,
-            isValid,
             timestamp: new Date().toISOString(),
         }
 

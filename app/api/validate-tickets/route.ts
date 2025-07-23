@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
+import { ValidationHistoryManager } from "@/lib/validation-history"
 
 interface JiraTicket {
   key: string
@@ -52,24 +53,48 @@ async function validateSpecificFields(
   validationRules: string,
   productRequirements?: string,
 ) {
+  // Get previous history for context
+  const previousHistory = ValidationHistoryManager.getTicketHistory(ticket.key)
+
   const fieldResults = await Promise.all(
     fieldsToValidate.map(async (fieldName) => {
       const fieldValue = getFieldValue(ticket, fieldName)
       const fieldRules = extractFieldRules(validationRules, fieldName)
 
+      // Get previous feedback for this specific field
+      const previousFieldResult = previousHistory?.fieldResults?.find((f) => f.field === fieldName)
+      const previousFeedbackSection = previousFieldResult
+        ? `
+**Previous Validation History for ${fieldName}:**
+- Previous Score: ${previousFieldResult.score}/10
+- Previous Issues: ${previousFieldResult.issues.join("; ")}
+- Previous Suggestions: ${previousFieldResult.suggestions.join("; ")}
+- Last Validated: ${new Date(previousFieldResult.lastValidated).toLocaleDateString()}
+
+**IMPORTANT:** Avoid repeating similar issues or suggestions unless the field still has the same problems. Focus on new issues or acknowledge improvements made since last validation.`
+        : ""
+
       const { text } = await generateText({
         model: openai("gpt-4"),
-        system: `You are a precise field-specific Jira validator. Analyze ONLY the specified field against its specific rules.
+        system: `You are a precise field-specific Jira validator with historical context awareness. Analyze ONLY the specified field against its specific rules.
 
 **CRITICAL INSTRUCTIONS:**
 1. **Single Field Focus**: Only validate the specified field, ignore other fields
 2. **Specific & Measurable**: Only flag violations of explicit, quantifiable rules
 3. **Context Aware**: Consider field type and ticket context
 4. **No Cross-Field Issues**: Don't reference other fields in issues/suggestions
+5. **Historical Awareness**: Use previous validation history to avoid repetitive feedback
+6. **Evolution Recognition**: Acknowledge improvements or deteriorations since last validation
+7. **Fresh Perspective**: If previous issues are resolved, focus on new potential improvements
+
+**SCORING GUIDELINES:**
+- If field has improved since last validation, acknowledge the improvement
+- If same issues persist, mention they are still unresolved
+- Be more lenient if clear improvements have been made
+- Focus on the most impactful issues rather than minor nitpicks
 
 Return JSON:
 {
-  "isValid": boolean,
   "score": number (1-10),
   "issues": ["specific violations for this field only"],
   "suggestions": ["specific fixes for this field only"]
@@ -79,19 +104,19 @@ Field to validate: ${fieldName}
 Field value: ${fieldValue}
 Field-specific rules: ${fieldRules}
 ${productRequirements ? `Product Requirements: ${productRequirements}` : ""}
+${previousFeedbackSection}
 
 Ticket context:
 Key: ${ticket.key}
 Type: ${inferTicketType(ticket)}
 
-Validate ONLY the ${fieldName} field against its specific rules.`,
+Validate ONLY the ${fieldName} field against its specific rules, considering any previous validation history.`,
       })
 
       try {
         const analysis = JSON.parse(text)
         return {
           field: fieldName,
-          isValid: analysis.isValid,
           score: analysis.score,
           issues: analysis.issues || [],
           suggestions: analysis.suggestions || [],
@@ -100,7 +125,6 @@ Validate ONLY the ${fieldName} field against its specific rules.`,
       } catch (parseError) {
         return {
           field: fieldName,
-          isValid: false,
           score: 0,
           issues: [`Failed to analyze ${fieldName} field`],
           suggestions: [`Re-validate ${fieldName} field`],
@@ -111,12 +135,10 @@ Validate ONLY the ${fieldName} field against its specific rules.`,
   )
 
   // Calculate overall scores
-  const overallScore = 0
-  const isValid = fieldResults.every((field) => field.isValid) && overallScore >= 7
+  const overallScore = Math.floor(fieldResults.reduce((sum, field) => sum + field.score, 0) / fieldResults.length)
 
   return {
     ticket,
-    isValid,
     score: overallScore,
     issues: fieldResults.flatMap((f) => f.issues),
     suggestions: fieldResults.flatMap((f) => f.suggestions),
@@ -127,12 +149,38 @@ Validate ONLY the ${fieldName} field against its specific rules.`,
 
 async function validateFullTicket(ticket: JiraTicket, validationRules: string, productRequirements?: string) {
   const productRequirementsSection = productRequirements ? `Product Requirements: ${productRequirements}` : ""
-
   const validationInstruction = productRequirements ? "rules and product requirements" : "rules"
+
+  // Get previous history for context
+  const previousHistory = ValidationHistoryManager.getTicketHistory(ticket.key)
+  const previousValidationSection = previousHistory
+    ? `
+**Previous Validation History:**
+- Previous Overall Score: ${previousHistory.score}/10
+- Previous Validation Date: ${new Date(previousHistory.timestamp).toLocaleDateString()}
+- Previous Issues: ${previousHistory.issues.join("; ")}
+- Previous Suggestions: ${previousHistory.suggestions.join("; ")}
+
+**Field-by-Field Previous Results:**
+${previousHistory.fieldResults
+  ?.map(
+    (f) => `
+- ${f.field}: Score ${f.score}/10
+  Issues: ${f.issues.join("; ") || "None"}
+  Suggestions: ${f.suggestions.join("; ") || "None"}`,
+  )
+  .join("")}
+
+**IMPORTANT:** Use this history to:
+1. Avoid repeating similar issues/suggestions unless problems persist
+2. Acknowledge improvements made since last validation
+3. Focus on new issues or areas that need attention
+4. Adjust scoring based on progress made`
+    : ""
 
   const { text } = await generateText({
     model: openai("gpt-4"),
-    system: `You are a precise Jira ticket validator. You must analyze tickets against SPECIFIC, MEASURABLE criteria only.
+    system: `You are a precise Jira ticket validator with historical context awareness. You must analyze tickets against SPECIFIC, MEASURABLE criteria only.
 
 **CRITICAL INSTRUCTIONS:**
 1. **Be Specific & Measurable**: Only flag issues that violate specific, quantifiable rules
@@ -140,6 +188,12 @@ async function validateFullTicket(ticket: JiraTicket, validationRules: string, p
 3. **Check Actual Content**: Verify sections don't exist with different wording before flagging as missing
 4. **One Issue Per Field**: If a field meets requirements, don't suggest additional improvements
 5. **Context Awareness**: Consider ticket type when applying rules
+${previousHistory ? 
+"6. **Historical Intelligence**: Use previous validation history to provide better feedback\n" +
+"7. **Acknowledge Progress**: Recognize improvements made since last validation\n" +
+"8. **Fresh Insights**: Focus on new issues rather than repeating old feedback" : ""
+}
+
 
 **SCORING GUIDELINES:**
 - 9-10: Meets all specific criteria perfectly without any issue
@@ -147,17 +201,19 @@ async function validateFullTicket(ticket: JiraTicket, validationRules: string, p
 - 5-6: Missing 1-2 required elements
 - 3-4: Multiple missing required elements
 - 1-2: Severely incomplete or violates multiple critical criteria
+${previousHistory ? 
+"- **Bonus consideration**: If ticket has improved since last validation, be more generous with scoring\n" +
+"- **Penalty consideration**: If same issues persist from previous validation, be more critical" : ""
+}
 
 Return JSON with field-level breakdown:
 {
-  "isValid": boolean,
   "score": number (1-10),
   "issues": ["specific rule violations only"],
   "suggestions": ["specific, actionable fixes only"],
   "fieldResults": [
     {
       "field": "summary|description|priority|status|assignee",
-      "isValid": boolean,
       "score": number,
       "issues": ["field-specific issues"],
       "suggestions": ["field-specific suggestions"],
@@ -168,6 +224,7 @@ Return JSON with field-level breakdown:
     prompt: `
 Validation Rules: ${validationRules}
 ${productRequirementsSection}
+${previousValidationSection}
 
 Ticket: ${ticket.key}
 Summary: ${ticket.summary}
@@ -177,14 +234,13 @@ Status: ${ticket.status}
 Reporter: ${ticket.reporter}
 Assignee: ${ticket.assignee || "Unassigned"}
 
-Analyze against ${validationInstruction}. Provide both overall and field-level results.`,
+Analyze against ${validationInstruction} ${previousHistory ? "with historical context" : ""}. Provide both overall and field-level results.`,
   })
 
   try {
     const analysis = JSON.parse(text)
     return {
       ticket,
-      isValid: analysis.isValid,
       score: analysis.score,
       issues: analysis.issues || [],
       suggestions: analysis.suggestions || [],
@@ -194,7 +250,6 @@ Analyze against ${validationInstruction}. Provide both overall and field-level r
   } catch (parseError) {
     return {
       ticket,
-      isValid: false,
       score: 0,
       issues: ["Failed to analyze ticket - please try again"],
       suggestions: ["Re-run validation to get proper analysis"],

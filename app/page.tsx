@@ -43,7 +43,6 @@ interface JiraTicket {
 
 interface ValidationResult {
   ticket: JiraTicket
-  isValid: boolean
   score: number
   issues: string[]
   suggestions: string[]
@@ -240,11 +239,14 @@ export default function JiraTicketValidator() {
             )
 
             if (changedFields.length === 0) {
+              const overallScore = Math.floor(
+                  previousHistory.fieldResults.reduce((sum, field) => sum + field.score, 0) / previousHistory.fieldResults.length,
+              )
+
               // No changes - return cached results
               return {
                 ticket,
-                isValid: previousHistory.isValid,
-                score: previousHistory.overallScore,
+                score: overallScore,
                 issues: previousHistory.fieldResults.flatMap((f) => f.issues),
                 suggestions: previousHistory.fieldResults.flatMap((f) => f.suggestions),
                 fieldResults: previousHistory.fieldResults,
@@ -282,11 +284,9 @@ export default function JiraTicketValidator() {
               const overallScore = Math.floor(
                 mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
               )
-              const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
 
               return {
                 ticket,
-                isValid,
                 score: overallScore,
                 issues: mergedFieldResults.flatMap((f) => f.issues),
                 suggestions: mergedFieldResults.flatMap((f) => f.suggestions),
@@ -315,8 +315,13 @@ export default function JiraTicketValidator() {
               ValidationHistoryManager.updateTicketHistory(ticket.key, currentSnapshot, result.fieldResults)
             }
 
+            const overallScore = Math.floor(
+                result.fieldResults.reduce((sum, field) => sum + field.score, 0) / result.fieldResults.length,
+            )
+
             return {
               ...result,
+              score: overallScore,
               validationType: "full",
               changedFields: ["summary", "description", "priority", "status", "assignee"],
               cachedFields: [],
@@ -390,11 +395,14 @@ export default function JiraTicketValidator() {
                 cachedFields: previousHistory.fieldResults.map((f) => f.field),
               }
             } else {
+              const overallScore = Math.floor(
+                  previousHistory.fieldResults.reduce((sum, field) => sum + field.score, 0) / previousHistory.fieldResults.length,
+              )
+
               // Fallback: reconstruct from history if not in current results
               newResult = {
                 ticket: latestTicket,
-                isValid: previousHistory.isValid,
-                score: previousHistory.overallScore,
+                score: overallScore,
                 issues: previousHistory.fieldResults.flatMap((f) => f.issues),
                 suggestions: previousHistory.fieldResults.flatMap((f) => f.suggestions),
                 fieldResults: previousHistory.fieldResults,
@@ -436,11 +444,9 @@ export default function JiraTicketValidator() {
             const overallScore = Math.floor(
               mergedFieldResults.reduce((sum, field) => sum + field.score, 0) / mergedFieldResults.length,
             )
-            const isValid = mergedFieldResults.every((field) => field.isValid) && overallScore >= 7
 
             newResult = {
               ticket: latestTicket,
-              isValid,
               score: overallScore,
               issues: mergedFieldResults.flatMap((f) => f.issues),
               suggestions: mergedFieldResults.flatMap((f) => f.suggestions),
@@ -522,14 +528,14 @@ export default function JiraTicketValidator() {
     })
   }
 
-  const getStatusIcon = (isValid: boolean, score: number) => {
-    if (isValid && score >= 8) return <CheckCircle className="h-5 w-5 text-green-500" />
+  const getStatusIcon = (score: number) => {
+    if (score >= 8) return <CheckCircle className="h-5 w-5 text-green-500" />
     if (score >= 6) return <Clock className="h-5 w-5 text-yellow-500" />
     return <AlertCircle className="h-5 w-5 text-red-500" />
   }
 
-  const getStatusColor = (isValid: boolean, score: number) => {
-    if (isValid && score >= 8) return "bg-green-100 text-green-800"
+  const getStatusColor = (score: number) => {
+    if (score >= 8) return "bg-green-100 text-green-800"
     if (score >= 6) return "bg-yellow-100 text-yellow-800"
     return "bg-red-100 text-red-800"
   }
@@ -1094,14 +1100,14 @@ export default function JiraTicketValidator() {
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          {getStatusIcon(result.isValid, result.score)}
+                          {getStatusIcon(result.score)}
                           <div>
                             <CardTitle className="text-lg font-semibold text-gray-800">{result.ticket.key}</CardTitle>
                             <CardDescription className="text-gray-600">{result.ticket.summary}</CardDescription>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(result.isValid, result.score)}>
+                          <Badge className={getStatusColor(result.score)}>
                             Score: {result.score}/10
                           </Badge>
                           {result.validationType && (
